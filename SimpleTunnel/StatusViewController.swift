@@ -22,6 +22,8 @@ extension NEVPNStatus: CustomStringConvertible {
         	case .connecting: return "Connecting"
         	case .disconnecting: return "Disconnecting"
         	case .reasserting: return "Reconnecting"
+        @unknown default:
+            fatalError()
         }
     }
 }
@@ -73,7 +75,7 @@ class StatusViewController: UITableViewController {
 				try session.sendProviderMessage(message) { response in
 					if response != nil {
 						let responseString = NSString(data: response!, encoding: String.Encoding.utf8.rawValue)
-						simpleTunnelLog("Received response from the provider: \(responseString)")
+						simpleTunnelLog("Received response from the provider: \(responseString ?? "")")
 					} else {
 						simpleTunnelLog("Got a nil response from the provider")
 					}

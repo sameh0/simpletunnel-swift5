@@ -19,7 +19,9 @@ extension NEOnDemandRuleAction: CustomStringConvertible {
 			case .disconnect: return "Disconnect"
 			case .ignore: return "Maintain"
 			case .evaluateConnection: return "Evaluate Connection"
-		}
+        @unknown default:
+            fatalError()
+        }
 	}
 }
 
@@ -82,7 +84,7 @@ class OnDemandRuleAddEditController: ConfigurationParametersViewController {
 			interfaceTypeCell,
 			SSIDsCell,
 			URLProbeCell
-		].flatMap { $0 }
+        ].compactMap { $0 }
 
 		URLProbeCell.valueChanged = {
 			if let enteredText = self.URLProbeCell.textField.text {
@@ -139,8 +141,8 @@ class OnDemandRuleAddEditController: ConfigurationParametersViewController {
 				guard let enumController = segue.destination as? EnumPickerController else { break }
 
 				let enumValues: [NEOnDemandRuleInterfaceType] = [ .any, .wiFi, .cellular ],
-					stringValues = enumValues.flatMap { $0.description },
-					currentSelection = enumValues.index { $0 == targetRule.interfaceTypeMatch }
+                    stringValues = enumValues.flatMap { $0.description }.map{ String($0) },
+					currentSelection = enumValues.firstIndex { $0 == targetRule.interfaceTypeMatch }
 
 				enumController.setValues(stringValues, title: "Interface Type", currentSelection: currentSelection) { newRow in
 					self.targetRule.interfaceTypeMatch = enumValues[newRow]
@@ -167,8 +169,8 @@ class OnDemandRuleAddEditController: ConfigurationParametersViewController {
 				guard let enumController = segue.destination as? EnumPickerController else { break }
 
 				let enumValues: [NEOnDemandRuleAction] = [ .evaluateConnection, .disconnect, .connect, .ignore ],
-					stringValues = enumValues.flatMap { $0.description },
-					currentSelection = enumValues.index { $0 == targetRule.action }
+                    stringValues = enumValues.flatMap { $0.description }.map{ String($0) },
+					currentSelection = enumValues.firstIndex { $0 == targetRule.action }
 
 				enumController.setValues(stringValues, title: "Action", currentSelection: currentSelection) { newRow in
 					self.changeTargetRuleType(enumValues[newRow])
@@ -220,7 +222,9 @@ class OnDemandRuleAddEditController: ConfigurationParametersViewController {
 
 			case .ignore:
 				newRule = NEOnDemandRuleIgnore()
-		}
+        @unknown default:
+            fatalError()
+        }
 
 		newRule.dnsSearchDomainMatch = targetRule.dnsSearchDomainMatch
 		newRule.dnsServerAddressMatch = targetRule.dnsServerAddressMatch

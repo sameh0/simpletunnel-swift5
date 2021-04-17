@@ -19,7 +19,9 @@ extension NWTCPConnectionState: CustomStringConvertible {
 			case .disconnected: return "Disconnected"
 			case .invalid: return "Invalid"
 			case .waiting: return "Waiting"
-		}
+        @unknown default:
+            fatalError()
+        }
 	}
 }
 
@@ -32,7 +34,7 @@ open class ClientTunnel: Tunnel {
 	open var connection: NWTCPConnection?
 
 	/// The last error that occurred on the tunnel.
-	open var lastError: NSError?
+	open var lastError: Error?
 
 	/// The previously-received incomplete message data.
 	var previousData: NSMutableData?
@@ -54,8 +56,8 @@ open class ClientTunnel: Tunnel {
 		if let colonRange = serverAddress.rangeOfCharacter(from: CharacterSet(charactersIn: ":"), options: [], range: nil) {
 			// The server is specified in the configuration as <host>:<port>.
             
-            let hostname = serverAddress.substring(with: serverAddress.startIndex..<colonRange.lowerBound)
-			let portString = serverAddress.substring(with: serverAddress.index(after: colonRange.lowerBound)..<serverAddress.endIndex)
+            let hostname = String(serverAddress[serverAddress.startIndex..<colonRange.lowerBound])
+			let portString = String(serverAddress[serverAddress.index(after: colonRange.lowerBound)..<serverAddress.endIndex])
 
 			guard !hostname.isEmpty && !portString.isEmpty else {
 				return .badConfiguration
@@ -78,7 +80,7 @@ open class ClientTunnel: Tunnel {
 	}
 
 	/// Close the tunnel.
-	open func closeTunnelWithError(_ error: NSError?) {
+	open func closeTunnelWithError(_ error: Error?) {
 		lastError = error
 		closeTunnel()
 	}
@@ -100,14 +102,14 @@ open class ClientTunnel: Tunnel {
 
 			let lengthData = data
 
-			guard lengthData.count == MemoryLayout<UInt32>.size else {
-				simpleTunnelLog("Length data length (\(lengthData.count)) != sizeof(UInt32) (\(MemoryLayout<UInt32>.size)")
+            guard lengthData?.count == MemoryLayout<UInt32>.size else {
+                simpleTunnelLog("Length data length (\(lengthData?.count ?? 0)) != sizeof(UInt32) (\(MemoryLayout<UInt32>.size)")
 				self.closeTunnelWithError(SimpleTunnelError.internalError as NSError)
 				return
 			}
 
 			var totalLength: UInt32 = 0
-			(lengthData as NSData).getBytes(&totalLength, length: MemoryLayout<UInt32>.size)
+            (lengthData! as NSData).getBytes(&totalLength, length: MemoryLayout<UInt32>.size)
 
 			if totalLength > UInt32(Tunnel.maximumMessageSize) {
 				simpleTunnelLog("Got a length that is too big: \(totalLength)")
@@ -127,13 +129,13 @@ open class ClientTunnel: Tunnel {
 
 				let payloadData = data
 
-				guard payloadData.count == Int(totalLength) else {
-					simpleTunnelLog("Payload data length (\(payloadData.count)) != payload length (\(totalLength)")
+                guard payloadData?.count == Int(totalLength) else {
+                    simpleTunnelLog("Payload data length (\(payloadData?.count ?? 0)) != payload length (\(totalLength)")
 					self.closeTunnelWithError(SimpleTunnelError.internalError as NSError)
 					return
 				}
 
-				_ = self.handlePacket(payloadData)
+                _ = self.handlePacket(payloadData ?? Data())
 
 				self.readNextPacket()
 			}
@@ -141,13 +143,13 @@ open class ClientTunnel: Tunnel {
 	}
 
 	/// Send a message to the tunnel server.
-	open func sendMessage(_ messageProperties: [String: AnyObject], completionHandler: @escaping (NSError?) -> Void) {
+	open func sendMessage(_ messageProperties: [String: AnyObject], completionHandler: @escaping (Error?) -> Void) {
 		guard let messageData = serializeMessage(messageProperties) else {
 			completionHandler(SimpleTunnelError.internalError as NSError)
 			return
 		}
 
-		connection?.write(messageData, completionHandler: completionHandler as! (Error?) -> Void)
+		connection?.write(messageData, completionHandler: completionHandler)
 	}
 
 	// MARK: NSObject

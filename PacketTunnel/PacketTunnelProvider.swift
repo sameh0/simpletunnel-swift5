@@ -24,7 +24,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelDelegate, ClientTunnel
 	var pendingStartCompletion: ((Error?) -> Void)?
 
 	/// The completion handler to call when the tunnel is fully disconnected.
-	var pendingStopCompletion: ((Void) -> Void)?
+    var pendingStopCompletion: (() -> Void)?
 
 	// MARK: NEPacketTunnelProvider
 
@@ -34,7 +34,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelDelegate, ClientTunnel
 		newTunnel.delegate = self
 
 		if let error = newTunnel.startTunnel(self) {
-			completionHandler(error as NSError)
+			completionHandler(error )
 		}
 		else {
 			// Save the completion handler for when the tunnel is fully established.
@@ -85,7 +85,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelDelegate, ClientTunnel
 		}
 		else if pendingStopCompletion != nil {
 			// Closed as the result of a call to stopTunnelWithReason, call the stop completion handler.
-			pendingStopCompletion?()
+            pendingStopCompletion?()
 			pendingStopCompletion = nil
 		}
 		else {
@@ -106,17 +106,17 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelDelegate, ClientTunnel
 
 		// Create the virtual interface settings.
 		guard let settings = createTunnelSettingsFromConfiguration(configuration) else {
-			pendingStartCompletion?(SimpleTunnelError.internalError as NSError)
+			pendingStartCompletion?(SimpleTunnelError.internalError )
 			pendingStartCompletion = nil
 			return
 		}
 
 		// Set the virtual interface settings.
 		setTunnelNetworkSettings(settings) { error in
-			var startError: NSError?
+			var startError: Error?
 			if let error = error {
 				simpleTunnelLog("Failed to set the tunnel network settings: \(error)")
-				startError = SimpleTunnelError.badConfiguration as NSError
+				startError = SimpleTunnelError.badConfiguration
 			}
 			else {
 				// Now we can start reading and writing packets to/from the virtual interface.
@@ -130,7 +130,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelDelegate, ClientTunnel
 	}
 
 	/// Handle the event of the logical flow of packets being torn down.
-	func tunnelConnectionDidClose(_ connection: ClientTunnelConnection, error: NSError?) {
+	func tunnelConnectionDidClose(_ connection: ClientTunnelConnection, error: Error?) {
 		tunnelConnection = nil
 		tunnel?.closeTunnelWithError(error)
 	}
@@ -145,7 +145,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelDelegate, ClientTunnel
 		let newSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: tunnelAddress)
 		var fullTunnel = true
 
-		newSettings.iPv4Settings = NEIPv4Settings(addresses: [address], subnetMasks: [netmask])
+        newSettings.ipv4Settings = NEIPv4Settings(addresses: [address], subnetMasks: [netmask])
 
 		if let routes = getValueFromPlist(configuration, keyArray: [.IPv4, .Routes]) as? [[String: AnyObject]] {
 			var includedRoutes = [NEIPv4Route]()
@@ -156,12 +156,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider, TunnelDelegate, ClientTunnel
 					includedRoutes.append(NEIPv4Route(destinationAddress: netAddress, subnetMask: netMask))
 				}
 			}
-			newSettings.iPv4Settings?.includedRoutes = includedRoutes
+            newSettings.ipv4Settings?.includedRoutes = includedRoutes
 			fullTunnel = false
 		}
 		else {
 			// No routes specified, use the default route.
-			newSettings.iPv4Settings?.includedRoutes = [NEIPv4Route.default()]
+            newSettings.ipv4Settings?.includedRoutes = [NEIPv4Route.default()]
 		}
 
 		if let DNSDictionary = configuration[SettingsKey.DNS.rawValue as NSString] as? [String: AnyObject],
